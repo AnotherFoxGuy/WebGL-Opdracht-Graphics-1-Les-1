@@ -1,0 +1,251 @@
+<html>
+
+<head>
+<title>WebGL Les 1</title>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<script type="text/javascript" src="gl-matrix-2.2.1.js"></script>
+
+<!-- This is the fragment shader. It handles coloring of the screen.
+     This is a very simple example, which only does two things:
+        1. It sets the shader's precision to mediump (this works with all WebGL enabled devices)
+        2. It sets the fragment's color to a 4-dimensional vector, which basically means
+           vec4(red,green,blue,alpha)
+-->
+<script id="shader-fs" type="x-shader/x-fragment">
+    precision mediump float;
+
+    void main(void) {
+        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+    }
+</script>
+
+<!-- This is the vertex shader. It handles the placement of vertices on the screen.
+     It has three variables, all of which it get's from the Javascript below.
+     The aVertexPosition attribute is the current vertex's position. This will be
+     used in conjunction with the model-view matrix and projection matrix to calculate
+     it's position on-screen. These two matrixes are also provided by te Javascript below. -->
+<script id="shader-vs" type="x-shader/x-vertex">
+    attribute vec3 aVertexPosition;
+
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+
+    void main(void) {
+        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+    }
+</script>
+
+
+<script type="text/javascript">
+
+    var gl;
+    function initGL(canvas) {
+        try {
+            gl = canvas.getContext("webgl");
+            gl.viewportWidth = canvas.width;
+            gl.viewportHeight = canvas.height;
+        } catch (e) {
+        }
+        if (!gl) {
+            alert("Could not initialise WebGL, sorry :-(");
+        }
+    }
+
+
+    function getShader(gl, id) {
+        //Get the script element
+        var shaderScript = document.getElementById(id);
+        if (!shaderScript) {
+            return null;
+        }
+
+        //Get the shader code
+        var str = "";
+        var k = shaderScript.firstChild;
+        while (k) {
+            if (k.nodeType == 3) {
+                str += k.textContent;
+            }
+            k = k.nextSibling;
+        }
+
+        //Check if the shader is either a fragment or vertex shader and create it
+        var shader;
+        if (shaderScript.type == "x-shader/x-fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (shaderScript.type == "x-shader/x-vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+            return null;
+        }
+
+        //Set the shader's source to the code from the script
+        gl.shaderSource(shader, str);
+        //Compile the shader from source
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    }
+
+
+    var shaderProgram;
+
+    //Fragment shader: handles the coloring of the screen
+    //Vertex shader: handles the positioning of the vertices
+    function initShaders() {
+        //Get shader code from page
+        var fragmentShader = getShader(gl, "shader-fs");
+        var vertexShader = getShader(gl, "shader-vs");
+
+        //Create blank shader program
+        shaderProgram = gl.createProgram();
+        //Bind the two shaders to the new program (only one of each type) and finally link them
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+
+        //Set this program to be the one in use by WebGL
+        gl.useProgram(shaderProgram);
+
+        //Get a pointer to aVertexPosition attribute from the shader and store it in shaderProgram
+        shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+        //Attributes are disabled by default, and need to be enabled to be used by our code
+        gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+        //This code gets both uniforms from the shader program, and also stores them in the program variable for later use
+        shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+        shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+    }
+
+
+    var mvMatrix = mat4.create();
+    var pMatrix = mat4.create();
+
+    function setMatrixUniforms() {
+        //Upload the projection- and model-view matrix to the current shader in use
+        gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+        gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+    }
+
+
+
+    var triangleVertexPositionBuffer;
+    var squareVertexPositionBuffer;
+
+    function initBuffers() {
+        //Create the buffer
+        triangleVertexPositionBuffer = gl.createBuffer();
+        //Set current buffer in use to triangleVertexPositionBuffer
+        gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
+        //Create the vertices
+        var vertices = [
+             0.0,  1.0,  0.0,
+            -1.0, -1.0,  0.0,
+             1.0, -1.0,  0.0
+        ];
+        //Put the vertex data into the current buffer in use (triangleVertexPositionBuffer)
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+        //Log the number of items (vertices) and the number of floats that make up a vertex (3)
+        triangleVertexPositionBuffer.itemSize = 3;
+        triangleVertexPositionBuffer.numItems = 3;
+
+        //Rinse and repeat
+        squareVertexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexPositionBuffer);
+        vertices = [
+             1.0,  1.0,  0.0,
+            -1.0,  1.0,  0.0,
+             1.0, -1.0,  0.0,
+            -1.0, -1.0,  0.0
+        ];
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+        squareVertexPositionBuffer.itemSize = 3;
+        squareVertexPositionBuffer.numItems = 4;
+    }
+
+
+    function drawScene() {
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        
+        mat4.perspective (pMatrix, 45.0, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
+
+        mat4.identity(mvMatrix);
+
+        //Do the translation and update the model's position
+        mat4.translate(mvMatrix, mvMatrix, [-1.5, 0.0, -5.4]);
+        //Current buffer in use will be triangleVertexPositionBuffer
+        gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
+        //This line sets the shaderProgram's vertexPositionAttribute to the currently bound buffer (the triangleVertexPositionBuffer)
+        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, triangleVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+        //This code uploads the projection- and model-view matrix into the shaders
+        setMatrixUniforms();
+        //This draws the vertices with the setup state
+        gl.drawArrays(gl.TRIANGLES, 0, triangleVertexPositionBuffer.numItems);
+
+
+        var z = 0;
+
+        if(farAway) {
+            z = -10;
+        }
+
+        mat4.translate(mvMatrix, mvMatrix, [3.0, 0.0, z]);
+        gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexPositionBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, squareVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+        setMatrixUniforms();
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, squareVertexPositionBuffer.numItems);
+    }
+
+
+    var farAway = true;
+
+    function webGLStart() {
+        var canvas = document.getElementById("lesson01-canvas");
+        initGL(canvas);
+        initShaders();
+        initBuffers();
+
+        //Set the backbround color to black
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        //Set WebGL to check if a model is behind another
+        gl.enable(gl.DEPTH_TEST);
+
+        //This is the draw function
+        //When it's called, it draws the scene
+        //and calls itself again after one second.
+        //This means we're running on 1 FPS :D
+        function draw() {
+            drawScene();
+            farAway = !farAway;
+
+            setTimeout(draw, 1000);
+        }
+
+        //Initial setTimeout to jumpstart the draw function above
+        setTimeout(draw, 1000);
+    }
+
+
+</script>
+
+
+</head>
+
+
+<body onload="webGLStart();">
+    <canvas id="lesson01-canvas" style="border: none;" width="500" height="500"></canvas>
+</body>
+
+</html>
