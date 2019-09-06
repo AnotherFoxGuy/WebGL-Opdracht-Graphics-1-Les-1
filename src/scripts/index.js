@@ -1,7 +1,9 @@
 import './gl-matrix-2.2.1';
 
-
 var gl;
+
+var pos = [-1.5, 0.0, -5.4];
+var rot = 0;
 
 function initGL(canvas) {
     try {
@@ -101,78 +103,62 @@ function setMatrixUniforms() {
 }
 
 
-var triangleVertexPositionBuffer;
-var squareVertexPositionBuffer;
+var octagonVertexPositionBuffer;
 
 function initBuffers() {
     //Create the buffer
-    triangleVertexPositionBuffer = gl.createBuffer();
-    //Set current buffer in use to triangleVertexPositionBuffer
-    gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
+    octagonVertexPositionBuffer = gl.createBuffer();
+    //Set current buffer in use to octagonVertexPositionBuffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, octagonVertexPositionBuffer);
     //Create the vertices
     var vertices = [
-        0.0, 1.0, 0.0,
-        -1.0, -1.0, 0.0,
-        1.0, -1.0, 0.0
+        0.0, 0.0, 0.0,
+        1.0, 1.0, 0.0,
+        2.25, 1.0, 0.0,
+        3.25, 0.0, 0.0,
+        3.25, -1.25, 0.0,
+        2.25, -2.25, 0.0,
+        1.0, -2.25, 0.0,
+        0.0, -1.25, 0.0
     ];
-    //Put the vertex data into the current buffer in use (triangleVertexPositionBuffer)
+    //Put the vertex data into the current buffer in use (octagonVertexPositionBuffer)
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
     //Log the number of items (vertices) and the number of floats that make up a vertex (3)
-    triangleVertexPositionBuffer.itemSize = 3;
-    triangleVertexPositionBuffer.numItems = 3;
-
-    //Rinse and repeat
-    squareVertexPositionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexPositionBuffer);
-    vertices = [
-        1.0, 1.0, 0.0,
-        -1.0, 1.0, 0.0,
-        1.0, -1.0, 0.0,
-        -1.0, -1.0, 0.0
-    ];
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-    squareVertexPositionBuffer.itemSize = 3;
-    squareVertexPositionBuffer.numItems = 4;
+    octagonVertexPositionBuffer.itemSize = 3;
+    octagonVertexPositionBuffer.numItems = 8;
 }
 
 
 function drawScene() {
+    rot += 0.01;
+    if(rot > 90)
+        rot = 0;
+
     gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
 
     mat4.perspective(pMatrix, 45.0, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
 
     mat4.identity(mvMatrix);
 
+
+    //mat4.translate(mvMatrix, mvMatrix, [10, 0, 0]);
+
+    mat4.rotateZ(mvMatrix, mvMatrix, rot);
+
     //Do the translation and update the model's position
-    mat4.translate(mvMatrix, mvMatrix, [-1.5, 0.0, -5.4]);
-    //Current buffer in use will be triangleVertexPositionBuffer
-    gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
-    //This line sets the shaderProgram's vertexPositionAttribute to the currently bound buffer (the triangleVertexPositionBuffer)
-    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, triangleVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+    mat4.translate(mvMatrix, mvMatrix, [-1.5, 0.5, -5.4]);
+
+    //Current buffer in use will be octagonVertexPositionBuffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, octagonVertexPositionBuffer);
+    //This line sets the shaderProgram's vertexPositionAttribute to the currently bound buffer (the octagonVertexPositionBuffer)
+    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, octagonVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
     //This code uploads the projection- and model-view matrix into the shaders
     setMatrixUniforms();
     //This draws the vertices with the setup state
-    gl.drawArrays(gl.TRIANGLES, 0, triangleVertexPositionBuffer.numItems);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, octagonVertexPositionBuffer.numItems);
 
-
-    var z = 0;
-
-    if (farAway) {
-        z = -10;
-    }
-
-    mat4.translate(mvMatrix, mvMatrix, [3.0, 0.0, z]);
-    gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexPositionBuffer);
-    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, squareVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
-    setMatrixUniforms();
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, squareVertexPositionBuffer.numItems);
 }
-
-
-var farAway = true;
-
 function webGLStart() {
     var canvas = document.getElementById("lesson01-canvas");
     initGL(canvas);
@@ -190,13 +176,11 @@ function webGLStart() {
     //This means we're running on 1 FPS :D
     function draw() {
         drawScene();
-        farAway = !farAway;
-
-        setTimeout(draw, 1000);
+        setTimeout(draw, 16.7);
     }
 
     //Initial setTimeout to jumpstart the draw function above
-    setTimeout(draw, 1000);
+    setTimeout(draw, 1);
 }
 
 
